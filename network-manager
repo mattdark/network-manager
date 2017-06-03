@@ -1,0 +1,88 @@
+#!/usr/bin/env python2.7
+import curses
+import os
+class tinywifi:
+	def __init__(self):
+		self.x=-1
+		self.c=-1
+		self.r=-1
+		self.red={}
+		self.ch={}
+		self.ek={}
+	def scan(self):
+		cm="sudo ifconfig wlp2s0 up" #wlp2s0 must be replaced by the name of the wireless interface
+		os.system(cm)
+		cm="sudo iwlist wlp2s0 scan > ./red.txt" #wireless_tools must be installed to us iwlist
+		os.system(cm)
+	def read(self):
+		f=open("red.txt", "r")
+		while True:
+      			line = f.readline()
+      			if not line:
+				break
+      			#Save the name of ESSID
+      			if line.find("ESSID")>=0:
+				self.x=self.x+1
+        			word=line.split(":")
+				self.red[self.x] = word[1]
+				self.red[self.x] = self.red[self.x].replace('\n','')
+      			#Save the channel of connection
+      			if line.find("Channel:")>=0:
+                		self.c=self.c+1
+                		word=line.split(":")
+                		self.ch[self.c] = word[1]
+				self.ch[self.c] = self.ch[self.c].replace('\n','')
+      			#Save the state of the encryption key (on/off)
+      			if line.find("Encryption key:")>=0:
+                		self.r=self.r+1
+                		word=line.split(":")
+                		self.ek[self.r] = word[1]
+				self.ek[self.r] = self.ek[self.r].replace('\n','')
+	def connect(self):
+		#List the name of available connections
+		s=3
+		t=curses.initscr()
+		t.border(0)
+		t.addstr(1, 1, "Network Manager", curses.A_BOLD)
+		if self.red[0] == 0:
+			t.addstr(s,5,"There's no any network",curses.A_STANDOUT)
+			t.refresh()
+			curses.endwin()
+			self.clean()
+			exit()
+		t.addstr(s,5,"Networks Detected:",curses.A_STANDOUT)
+		for l in range (0,self.x+1):
+			s=s+2
+			nt = str(l+1)+".-" + self.red[l]
+			t.addstr(s,7,nt,curses.A_DIM)
+		t.addstr(s+2,5,"Press " + str(self.x+2) + " to Exit",curses.A_DIM)
+		s=s+4
+		t.addstr(s,9,"What connection do you choose: ",curses.A_DIM)
+		n=int(t.getstr())
+		if n==self.x+2:
+			t.refresh()
+                        curses.endwin()
+			self.clean()
+                        exit()
+		n=n-1
+		#Analize the encryption key, in consecuence determine the need of a WEP/WPA Key
+		if self.ek[n] == "on":
+			#Request encryption key
+			t.addstr(s+2,7,"WPA/WEP Key: ",curses.A_DIM)
+                	k=str(t.getstr())
+			cm = "iwconfig wlp2s0 essid " + str(self.red[n]) +  " channel " + str(self.ch[n]) + " key " + str(k) + " & dhclient -q wlp2s0"
+			os.system(cm)
+		else:
+			cm = "iwconfig wlp2s0 essid " + str(self.red[n]) + " channel " + str(self.ch[n]) + " & dhclient -q wlp2s0"
+			os.system(cm)
+		t.refresh()
+                curses.endwin()
+	def clean(self):
+		cm="sudo rm ./red.txt"
+		os.system(cm)
+if __name__ == '__main__':
+	a=tinywifi()
+	a.scan()
+	a.read()
+	a.connect()
+	a.clean()
